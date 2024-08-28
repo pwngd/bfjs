@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BFJS AUTH</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+  :root {
+    --subcolor: #1b1b1b;
+    --midcolor: #5d5d5d;
+  }
+
+  @font-face {
+    font-family: acuminpro;
+    src: url("https://cdn.glitch.global/86cdd47b-afc6-49b1-871a-3496550de294/Acumin-BdItPro.woff?v=1654131577589");
+  }
+
+  body { background-color: #0c0c0c; }
+  h1 { color: white; font-family: acuminpro; }
+  p { color: white; font-family: acuminpro; }
+  span { color: white; font-family: acuminpro; }
+  li { color: white; font-family: "Courier New", monospace; }
+    
+  li::marker {
+    color: red;
+  }
+
+  a  {
+    color: #5053ff;
+    background: -webkit-linear-gradient(blue, #5053ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  input {
+    background-color: var(--midcolor);
+    outline: none;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    font-family: acuminpro;
+  }
+    
+  button {
+    background-color: var(--midcolor);
+    outline: none;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    font-family: acuminpro;
+    padding: 3px;
+    transition-duration: 0.1s;
+    outline-color: var(--midcolor);
+  }
+    
+  button:active {
+    outline: 2px solid grey;
+  }
+    
+  hr {
+    background: linear-gradient(to right, red, blue);
+    border: none;
+    height: 5px;
+  }
+  
+  #top {
+    background-color: #0f0f0f;
+  }
+    
+  #message-container {
+    position: absolute;
+    top: 40%;
+    left: 0;
+    right: 0;
+    display: none;
+    margin-left: auto; 
+    margin-right: auto; 
+    width: max-content;
+    height: 80px;
+    padding: 5px;
+    border-radius: 7px;
+    background-color: var(--subcolor);
+  }
+    
+  #bigpopup {
+    position: absolute;
+    top: 20%;
+    left: 0;
+    right: 0;
+    display: none;
+    margin-left: auto; 
+    margin-right: auto; 
+    width: 70%;
+    height: 50%;
+    padding: 5px;
+    border-radius: 7px;
+    background-color: var(--subcolor);
+    z-index: 1000;
+    transition-duration: 0.25s;
+    overflow: auto;
+  }
+
+  .subtitle { color: #b9b9b9; }
+  .gradient {
+    background: -webkit-linear-gradient(130deg, blue, red);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .title span {
+    background: -webkit-linear-gradient(10deg, blue, red);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .infopanel {
+    display: none;
+    border-radius: 7px;
+    background-color: var(--subcolor);
+    padding: 3px;
+  }
+  .infopanel img {
+    width: 100%;
+    border-radius: inherit; 
+  }
+
+  .profile-picture {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+  }
+
+  .tag {
+    border-radius: 5px;
+    background-color: var(--midcolor);
+    padding: 1px;
+    font-size: 15px;
+  }
+
+  .accountpanel {
+    width: 150px;
+    height: 50px;
+    padding: 5px;
+    border-radius: 7px;
+    background-color: var(--subcolor);
+    display: inline-block;
+    margin-left: 20px;
+  } 
+
+  .accountpanel .profile-picture {
+    margin-right: 7px;
+  }
+
+  .accountpanel input {
+    width: 95%;
+  }
+  </style>
+  
+  <script>
+    window.addEventListener("load", ()=>{
+      const socket = io();
+      const loginInput = document.getElementById("logininput");
+      const refresh = document.getElementById("refresh-keys");
+      const keylist = document.getElementById("keylist");
+      const iplist = document.getElementById("iplist");
+      
+      let adminKey = "";
+      let keys = {};
+      let highlighted = null;
+      let highlightedKEY = "";
+      if (localStorage.getItem("adminKey")) adminKey=localStorage.getItem("adminKey");
+      if (adminKey!=="") { loginInput.value = adminKey; validate(); }
+      
+      loginInput.addEventListener("keydown", (e)=>{
+        if (e.key.toLowerCase()!="enter") return;
+        validate();
+      });
+      
+      refresh.addEventListener("click", refreshKeys);
+      document.getElementById("ban-key").addEventListener("click", ()=>managekey("ban"));
+      document.getElementById("unban-key").addEventListener("click", ()=>managekey("unban"));
+      
+      document.getElementById("gen-key").addEventListener("click", ()=>{
+        $.get(`/bfjs?key=${adminKey}`, data=>{
+          message(data, ()=>{
+            prompt(id=>{
+              $.get(`/bfjs?key=${adminKey}&name=${data}&id=${id}`, data=>{
+                message(`New ID: ${id}`);
+                refreshKeys();
+              });
+            });
+          });
+        });
+      });
+      
+      document.getElementById("testmessage").addEventListener("click", ()=>{
+        message("HELLOOOOOOOOOOOOOOOOOO");
+      });
+      
+      document.getElementById("write-id").addEventListener("click", ()=>{
+        prompt(id=>{
+          $.get(`/bfjs?key=${adminKey}&name=${highlightedKEY}&id=${id}`, data=>{
+            message(`New ID: ${id}`)
+          });
+        });
+      });
+      
+      document.getElementById("hide-keys").addEventListener("click", ()=>{
+        for (const v of keylist.children) {
+          v.innerHTML = "[Hidden]";
+        }
+      });
+      
+      document.getElementById("show-id").addEventListener("click", ()=>{
+        for (const v of keylist.children) {
+          let key = keys[v.innerHTML];
+          
+          if (key.id!=="") {
+            v.innerHTML = `${v.innerHTML}: ${key.id}`;
+          }
+        }
+      });
+      
+      document.getElementById("hwid-clear").addEventListener("click", ()=>{
+        $.get(`/bfjs?key=${adminKey}&target=${highlightedKEY}&hwidclear=true`, data=>{
+          message("Cleared HWID");
+        });
+      });
+      
+      document.getElementById("open-bigpopup").addEventListener("click", ()=>{
+        document.getElementById("bigpopup").style.opacity = "1";
+        document.getElementById("bigpopup").style.display = "block";
+      });
+      
+      document.getElementById("close-bigpopup").addEventListener("click", ()=>{
+        document.getElementById("bigpopup").style.opacity = "0";
+        setTimeout(()=>{
+          document.getElementById("bigpopup").style.display = "none";
+        }, 250);
+      });
+      
+      socket.on("live", data => {
+        if (!keys) return message("Refresh first");
+        const keyData = keys[data.key.trim()]
+        const entry = document.createElement("li");
+        entry.innerHTML = `[ID: ${keyData.id}], [IP: ${keyData.ips[keyData.ips.length-1]}], [HWID: ${keyData.device}]`
+        document.getElementById("live").appendChild(entry)
+      });
+      
+      function message(msg, callback) {
+        document.getElementById("message").innerHTML = msg;
+        document.getElementById("message-container").style.display = "block";
+        function cb(){
+          document.getElementById("okay-button").removeEventListener("click", cb);
+          callback();
+        }
+        if (callback) document.getElementById("okay-button").addEventListener("click", cb);
+      }
+      
+      function prompt(callback){
+        document.getElementById("message").innerHTML = "";
+        document.getElementById("message-container").style.display = "block";
+        document.getElementById("prompt").style.display = "block";
+        function cb(){
+          document.getElementById("okay-button").removeEventListener("click", cb);
+          callback(document.getElementById("prompt").value);
+          document.getElementById("prompt").value = "";
+          document.getElementById("prompt").style.display = "none";
+        }
+        document.getElementById("okay-button").addEventListener("click", cb);
+      }
+      
+      function managekey(type){
+        $.get(`/bfjs?key=${adminKey}&${type}=${highlightedKEY}`, data=>{
+          refreshKeys();
+        });
+      }
+      
+      function refreshKeys(){
+        keylist.innerHTML = "";
+        document.getElementById("keyrefresh-gif").style.display = "inline-block";
+        $.get(`/bfjs?key=${adminKey}&get=true`, response=>{
+          keys = response.apiKeys;
+          for (const k in response.apiKeys) {
+            const keyData = response.apiKeys[k];
+            const entry = document.createElement("li");
+            let firstIP = keyData.ips[0];
+            entry.innerHTML = k;
+            keylist.appendChild(entry);
+            if (keyData.banned) entry.style.color = "#c00";
+            
+            for (let i=0; i<keyData.ips.length; i++) {
+              if (keyData.ips[i]!==firstIP) {
+                entry.style.border = "solid orange 2px";
+                break;
+              }
+            }
+            
+            entry.addEventListener("click", ()=>{
+              if (highlighted) highlighted.style.backgroundColor = "";
+              highlighted = entry;
+              highlightedKEY = k;
+              entry.style.backgroundColor = "orange";
+              iplist.innerHTML = "";
+              const id = document.createElement("li");
+              id.innerHTML = "ID: " + keyData.id;
+              iplist.appendChild(id);
+              for (const v of keyData.ips) {
+                const ip = document.createElement("li");
+                ip.innerHTML = v;
+                iplist.appendChild(ip);
+              }
+            });
+          }
+          setTimeout(()=>document.getElementById("keyrefresh-gif").style.display = "none",500);
+        });
+      }
+      
+      function validate(){
+        document.getElementById("profile-picture").src = "https://cdn.glitch.global/051db0dd-131d-4dd0-8b2d-0c7667438890/loading_spin_grey.gif%2011ezlroiohbdwk2imlrjrbw2-1604486683.gif?v=1655143732053";
+        $.get(`/bfjs?key=${loginInput.value}&get=true`, response=>{
+          adminKey = loginInput.value;
+          localStorage.setItem("adminKey", adminKey);
+          loginInput.style.color = "#00ff93";
+          document.getElementById("profile-picture").src = "https://cdn.glitch.global/051db0dd-131d-4dd0-8b2d-0c7667438890/verified.png?v=1655145031691";
+          document.getElementById("panel").style.display = "block";
+          socket.emit("identify", adminKey);
+        }).fail(()=>{document.body.innerHTML=""; localStorage.clear()});
+      }
+    });
+  </script>
+</head>
+<body>
+  
+  <div id="top">
+    <h1 style="display:inline-block;" class="title">BFJS <span>Auth</span></h1>
+    <div class="accountpanel">
+      <img class="profile-picture" id="profile-picture" src="https://cdn.glitch.global/86cdd47b-afc6-49b1-871a-3496550de294/user-icon-placeholder-4069861791.png?v=1654213825204"/>
+      <span>Login</span>
+      <input id="logininput" type="password">
+    </div>
+    <hr/>
+  </div>
+  
+  <div style="display:none;" id="panel">
+    <h1 style="display:inline;">Keys</h1>
+    <img id="keyrefresh-gif" style="display:none; width:25px; height:25px;" src="https://cdn.glitch.global/051db0dd-131d-4dd0-8b2d-0c7667438890/loading_spin_grey.gif%2011ezlroiohbdwk2imlrjrbw2-1604486683.gif?v=1655143732053">
+    <br/>
+    <button id="refresh-keys">Refresh</button>
+    <button id="hide-keys">Hide</button>
+    <button style="background-color:red;" id="ban-key">Ban Key</button>
+    <button style="background-color:green;" id="unban-key">Unban Key</button>
+    <button style="background-color:orange;" id="gen-key">Gen Key</button>
+    <button style="background-color:blue;" id="write-id">Write ID</button>
+    <button style="background-color:darkorange" id="show-id">Show IDs</button>
+    <button style="background-color:darkblue;" id="hwid-clear">HWID Clear</button>
+    <button style="background-color:teal;" id="open-bigpopup">Live View</button>
+    <button style="background-color:darkblue;" id="testmessage">Test Message</button>
+    <br/>
+    <ol style="display:inline-block; float:left;" id="keylist"></ol>
+    <ol style="display:inline-block; float:left;" id="iplist"></ol>
+  </div>
+  
+  <div id="message-container">
+    <p id="message"></p>
+    <input style="display:none; margin-bottom:15px;" id="prompt" type="text">
+    <button style="width:100%" id="okay-button" onclick="document.getElementById('message-container').style.display='none'">Okay</button>
+  </div>
+  
+  <div id="bigpopup">
+    <h1>Live view</h1>
+    <button style="background-color:red;" id="close-bigpopup">Close</button>
+    <hr/>
+    <ol style="display:inline-block; float:left;" id="live"></ol>
+  </div>
+  
+</body>
+</html>
